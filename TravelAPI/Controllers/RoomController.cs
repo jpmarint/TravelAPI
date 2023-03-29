@@ -1,30 +1,48 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TravelAPI.Data;
+using TravelAPI.DTO.Room;
 using TravelAPI.Models;
 
 namespace TravelAPI.Controllers
 {
+    /// <summary>
+    /// Controller for handling room-related actions
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
     public class RoomController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IMapper _mapper;
 
-        public RoomController(DataContext context)
+        /// <summary>
+        /// Initialize the controller with the context to access the db and the class mapping to models
+        /// </summary>
+        public RoomController(DataContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/room
+        /// <summary>
+        /// Gets all rooms.
+        /// </summary>
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Room>>> GetAllRooms()
+        public async Task<ActionResult<IEnumerable<ShowRoomDto>>> GetAllRooms()
         {
-            return await _context.Rooms.ToListAsync();
+            var rooms = await _context.Rooms.ToListAsync();
+            var showRooms = _mapper.Map<List<ShowRoomDto>>(rooms);
+            return Ok(showRooms);
         }
 
+        /// <summary>
+        /// Gets the rooms by hotel identifier.
+        /// </summary>
         [HttpGet("hotel/{hotelId}")]
-        public async Task<ActionResult<IEnumerable<Room>>> GetRoomsByHotelId(int hotelId)
+        public async Task<ActionResult<IEnumerable<ShowRoomDto>>> GetRoomsByHotelId(int hotelId)
         {
             var rooms = await _context.Rooms.Where(r => r.Hotel.Id == hotelId).ToListAsync();
             if (rooms == null || rooms.Count == 0)
@@ -32,12 +50,16 @@ namespace TravelAPI.Controllers
                 return NotFound();
             }
 
-            return Ok(rooms);
+            var showRooms = _mapper.Map<List<ShowRoomDto>>(rooms);
+            return Ok(showRooms);
         }
 
         // GET: api/room/5
+        /// <summary>
+        /// Gets the room by identifier.
+        /// </summary>
         [HttpGet("{id}")]
-        public async Task<ActionResult<Room>> GetRoomById(int id)
+        public async Task<ActionResult<ShowRoomDto>> GetRoomById(int id)
         {
             var room = await _context.Rooms.FindAsync(id);
 
@@ -46,29 +68,47 @@ namespace TravelAPI.Controllers
                 return NotFound();
             }
 
-            return Ok(room);
+            var showRoom = _mapper.Map<ShowRoomDto>(room);
+            return Ok(showRoom);
         }
 
+
         // POST: api/room
+        /// <summary>
+        /// Creates a new room.
+        /// </summary>
         [HttpPost]
-        public async Task<ActionResult<Room>> CreateRoom(Room room)
+        public async Task<ActionResult<ShowRoomDto>> CreateRoom(UpsertRoomDto upsertRoomDto)
         {
+            var hotel = await _context.Hotels.FindAsync(upsertRoomDto.HotelId);
+            if (hotel == null)
+            {
+                return BadRequest("Hotel not found");
+            }
+
+            var room = _mapper.Map<Room>(upsertRoomDto);
+            room.Hotel = hotel;
             _context.Rooms.Add(room);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetRoomById), new { id = room.Id }, room);
+            var showRoom = _mapper.Map<ShowRoomDto>(room);
+            return CreatedAtAction(nameof(GetRoomById), new { id = showRoom.Id }, showRoom);
         }
 
         // PUT: api/room/5
+        /// <summary>
+        /// Updates an existing room.
+        /// </summary>
         [HttpPut("{id}")]
-        public async Task<ActionResult<Room>> UpdateRoom(int id, Room room)
+        public async Task<IActionResult> UpdateRoom(int id, UpsertRoomDto upsertRoomDto)
         {
-            if (id != room.Id)
+            var room = await _context.Rooms.FindAsync(id);
+            if (room == null)
             {
-                return BadRequest();
+                return NotFound();
             }
 
-            _context.Entry(room).State = EntityState.Modified;
+            _mapper.Map(upsertRoomDto, room);
 
             try
             {
@@ -76,7 +116,7 @@ namespace TravelAPI.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                bool RoomExists = _context.Rooms.Any(e => e.Id == id);
+                bool RoomExists = _context.Rooms.Any(room => room.Id == id);
                 if (!RoomExists)
                 {
                     return NotFound();
@@ -87,9 +127,12 @@ namespace TravelAPI.Controllers
                 }
             }
 
-            return Ok(room);
+            return NoContent();
         }
 
+        /// <summary>
+        /// Deletes an existing room.
+        /// </summary>
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteRoom(int id)
         {

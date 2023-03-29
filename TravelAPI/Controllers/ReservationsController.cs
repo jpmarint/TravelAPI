@@ -6,6 +6,9 @@ using TravelAPI.Data;
 
 namespace TravelAPI.Controllers
 {
+    /// <summary>
+    /// Controller for handling reservations-related actions
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
     public class ReservationsController : ControllerBase
@@ -13,6 +16,9 @@ namespace TravelAPI.Controllers
         private readonly DataContext _context;
         private readonly IMapper _mapper;
 
+        /// <summary>
+        /// Initialize the controller with the context to access the db and the class mapping to models
+        /// </summary>
         public ReservationsController(DataContext context, IMapper mapper)
         {
             _context = context;

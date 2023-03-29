@@ -11,6 +11,9 @@ using TravelAPI.Models;
 
 namespace TravelAPI.Controllers
 {
+    /// <summary>
+    /// Controller for handling user-related actions
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
     public class UserController : ControllerBase
@@ -18,6 +21,9 @@ namespace TravelAPI.Controllers
         private readonly DataContext _context;
         private readonly IMapper _mapper;
 
+        /// <summary>
+        /// Initialize the controller with the context to access the db and the class mapping to models
+        /// </summary>
         public UserController(DataContext context, IMapper mapper)
         {
             _context = context;

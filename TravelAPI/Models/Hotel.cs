@@ -8,6 +8,5 @@
         public decimal Commission { get; set; }
         public bool IsActive { get; set; }
         public User User { get; set; }
-        public List<Room> Rooms { get; set; }
     }
 }
