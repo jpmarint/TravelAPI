@@ -5,7 +5,6 @@ namespace TravelAPI.Models
     public class Reservation
     {
         public int Id { get; set; }
-        
         public decimal TotalCost { get; set; }
         public bool IsActive { get; set; } = true;
         public int NumberOfGuests { get; set; }

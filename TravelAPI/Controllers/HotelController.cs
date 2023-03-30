@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.Annotations;
 using TravelAPI.Data;
 using TravelAPI.DTO.Hotel;
+using TravelAPI.DTO.Room;
 using TravelAPI.Models;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -200,6 +201,43 @@ namespace TravelAPI.Controllers
 
             return Ok(showHotelDto);
         }
+
+
+        /// <summary>
+        /// Search hotels and available rooms that are active and available at given dates and optional number of people
+        /// </summary>
+        [HttpGet("search")]
+        public async Task<ActionResult<IEnumerable<HotelAvailabilityDto>>> SearchHotelAvailability(DateTime checkIn, DateTime checkOut, string city, int? numberOfGuests)
+        {
+            var availableHotels = await _context.Hotels
+                .Where(h => h.IsActive && h.Location.Contains(city, StringComparison.OrdinalIgnoreCase))
+                .Select(hotel => new HotelAvailabilityDto
+                {
+                    Id = hotel.Id,
+                    Name = hotel.Name,
+                    Location = hotel.Location,
+                    Rooms = _context.Rooms
+                        .Where(room => room.IsActive && room.Capacity >= numberOfGuests && room.Hotel.Id == hotel.Id)
+                        .Join(_context.Reservations.Where(reservation => reservation.IsActive), room => room.Id, reservation => reservation.Room.Id,
+                            (room, reservation) => new { Room = room, Reservation = reservation })
+                        .Where(join => join.Reservation.CheckOutDate <= checkIn || join.Reservation.CheckInDate >= checkOut)
+                        .Select(join => new RoomAvailabilityDto
+                        {
+                            Id = join.Room.Id,
+                            Name = join.Room.Type,
+                            Description = join.Room.Type,
+                            Capacity = join.Room.Capacity,
+                            Location = join.Room.Location,
+                            PricePerNight = (double)(join.Room.BaseCost * (1 + join.Room.Taxes))
+                        })
+                        .ToList()
+                })
+                .Where(hotel => hotel.Rooms.Any())
+                .ToListAsync();
+
+            return availableHotels;
+        }
+
 
     }
 }
