@@ -1,5 +1,7 @@
 using System.Reflection;
 using TravelAPI.Data;
+using TravelAPI.Models;
+using TravelAPI.Utils;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +19,8 @@ builder.Services.AddSwaggerGen(s =>
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     s.IncludeXmlComments(xmlPath);
 });
+builder.Services.Configure<MailSettings>(builder.Configuration.GetSection("MailSettings"));
+builder.Services.AddTransient<IMailSendService, MailSendService>();
 
 var app = builder.Build();
 

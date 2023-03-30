@@ -1,9 +1,11 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TravelAPI.Data;
 using TravelAPI.DTO.Reservation;
 using TravelAPI.Models;
+using TravelAPI.Utils;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -18,14 +20,16 @@ namespace TravelAPI.Controllers
     {
         private readonly DataContext _context;
         private readonly IMapper _mapper;
+        private readonly IMailSendService _mailService;
 
         /// <summary>
         /// Initialize the controller with the context to access the db and the class mapping to models
         /// </summary>
-        public ReservationsController(DataContext context, IMapper mapper)
+        public ReservationsController(DataContext context, IMapper mapper, IMailSendService mailService)
         {
             _context = context;
             _mapper = mapper;
+            _mailService = mailService;
         }
 
         // GET api/reservations
@@ -115,6 +119,8 @@ namespace TravelAPI.Controllers
             await _context.SaveChangesAsync();
 
             var showReservationDto = _mapper.Map<ShowReservationDto>(reservation);
+
+            await SendReservationEmail(reservation.Id);
 
             return CreatedAtAction(nameof(GetReservationById), new { id = showReservationDto.Id }, showReservationDto);
         }
@@ -212,6 +218,7 @@ namespace TravelAPI.Controllers
 
             var showReservationDtos = _mapper.Map<List<ShowReservationDto>>(reservations);
 
+
             return showReservationDtos;
         }
 
@@ -235,6 +242,53 @@ namespace TravelAPI.Controllers
             var showReservationDtos = _mapper.Map<List<ShowReservationDto>>(reservations);
 
             return showReservationDtos;
+        }
+
+        [HttpPost("{reservationId}/send-email")]
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public async Task<bool> SendReservationEmail(int reservationId)
+        {
+            var reservation = await _context.Reservations.FindAsync(reservationId);
+
+            if (reservation == null)
+            {
+                throw new Exception("La reserva no existe.");
+            }
+
+            var user = await _context.Users.FindAsync(reservation.User.Id);
+
+            if (user == null)
+            {
+                throw new Exception("No se encontró al usuario asociado con la reserva.");
+            }
+
+            var mailRequest = new MailRequest
+            {
+                ToEmail = user.Email,
+                Subject = $"Confirmación de reserva #{reservation.Id}",
+                Attachments = null,
+                Body = $"Estimado/a {user.FirstName} {user.LastName},\n\nGracias por hacer su reserva con nosotros.\n\n" +
+                       $"Aquí están los detalles de su reserva:\n\n" +
+                       $"Hotel: {reservation.Room.Hotel.Name}\n" +
+                       $"Habitación: {reservation.Room.Type}\n" +
+                       $"Fecha de entrada: {reservation.CheckInDate}\n" +
+                       $"Fecha de salida: {reservation.CheckOutDate}\n" +
+                       $"Precio por noche: {reservation.Room.BaseCost:C}\n\n" +
+                       $"Locación: {reservation.Room.Location}"+
+                       $"Por favor, póngase en contacto con nosotros si tiene alguna pregunta o necesita modificar su reserva.\n\n" +
+                       $"¡Esperamos verte pronto!\n\n" +
+                       $"Saludos cordiales,\nEl equipo de nuestro hotel"
+            };
+
+            try
+            {
+                await _mailService.SendEmailAsync(mailRequest);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
         }
     }
 }
